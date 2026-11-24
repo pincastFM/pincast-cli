@@ -1,0 +1,33 @@
+# The package's checks on every push to main, every pull request and once a day: the tests on
+# Node 20.12.0 (the oldest the package supports) and Node 22, the changelog entry for package.json's
+# version, and the package as it would publish.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '37 13 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.12.0', '22']
+    name: Node ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version && npm --version
+      # One dependency, @pincast/api, at the exact version package.json names. It has no
+      # dependencies of its own, so there is no lockfile to keep.
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - run: npm test
+      - run: node scripts/changelog.mjs --check
+      - run: npm pack --dry-run

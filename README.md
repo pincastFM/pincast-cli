@@ -117,6 +117,18 @@ import { runCreate } from '@pincast/cli/init'
 process.exitCode = await runCreate(process.argv.slice(2), { command: 'npm create pincast' })
 ```
 
+## Versions
+
+Every release follows one rule. [CHANGELOG.md](CHANGELOG.md) lists what each one changed.
+
+- **Patch** (0.1.0 to 0.1.1): a fix, or a change a script can't see, such as clearer text.
+- **Minor** (0.1.1 to 0.2.0): something new, and everything that worked still works. A new command, option, exit code or JSON field is a minor.
+- **Major** (0.2.0 to 1.0.0, then 2.0.0): something that worked can stop working. A command, option or JSON field removed or renamed is a major. So is an exit code that changes meaning, and so is raising the lowest Node version the command runs on.
+
+The rule holds below 1.0.0 too, so the first breaking change makes 1.0.0. While the version starts with 0, a range like `^0.1.0` takes patches only.
+
+`@pincast/api` is pinned to one exact version. A release that moves the pin takes the larger of the two changes.
+
 ## License
 
 MIT

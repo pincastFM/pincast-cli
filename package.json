@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "The pincast command: make a test app, send sets and collects, and test your webhook receiver.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pincastFM/pincast-cli.git"
+  },
+  "homepage": "https://github.com/pincastFM/pincast-cli#readme",
+  "bugs": {
+    "url": "https://github.com/pincastFM/pincast-cli/issues"
+  },
   "type": "module",
   "bin": {
     "pincast": "bin/pincast.js"
@@ -19,6 +27,10 @@
     "template",
     "template.json"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "engines": {
     "node": ">=20.12"
   },
@@ -27,7 +39,8 @@
   },
   "scripts": {
     "link-api": "node scripts/link-api.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "changelog": "node scripts/changelog.mjs"
   },
   "keywords": [
     "pincast",
