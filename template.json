@@ -1,0 +1,29 @@
+{
+  "source": "pincast-kit-example",
+  "commit": "192ebea9630ce7cbaa9c5398ff8f7b6f57d2e6d7",
+  "files": {
+    ".env.example": "f856d9ef1a15ae99cd7bc243fc1d456529d366518087ce19a464148070d8078c",
+    ".gitignore": "f822371805a9e9560e2ec2ed6803ce373c0b4328e35f655b79eb61f3703283ed",
+    "LICENSE": "b39d3a6d9cceafc50728f9830c5cf2ef996f5cf37fa4c7bf938b4af8d9ef5562",
+    "README.md": "6aa9e1c8186c20d03899890e37a26b8b7bf4f09f431b9c0e0bde3768942ce5c6",
+    "data/sample-collects.json": "f6e59c988d637da342ac635bceb6ae1273fc5f1c25e77312ef2b991608c96b10",
+    "data/set.json": "69c029dfb1554fee7ea572da0296a725aa794335481684c2cf85f7b6ca552580",
+    "index.html": "0c687695b76b996d07cdb8471d9dbb640499d971044ba77eaadba29b9e3575ae",
+    "package-lock.json": "16d33b155e11741fa6ceb570ce939ecb928fd34bdfae95f027f2152e06520ea0",
+    "package.json": "3da250cc1296143d4fcfbdb4ea02ccfe5915442343340668522263162cad036d",
+    "server/collection.js": "e740ae1c451b8eb3e4aa831246cc769b490a90345292e175dbc2ca506031ab83",
+    "server/index.js": "f26d6e904ac564d9076234ba275d3261c613acb67c8d7d09ee03850fb9233a79",
+    "server/route.js": "01c8531e2a472d317365fe2b2ebbb86ae761cded4bbe1b2563f9c9e87e987296",
+    "shared/app.js": "ee6b5ae31b21421d50941f4dc57dfa0469f1445713f971160019c0e6dc08d87c",
+    "src/App.vue": "aaf924bd39c6b287fda845068c039848f1b304f122b7f2044d51341ed34e5beb",
+    "src/lantern.css": "93eff596b14e7cf06dfbd830d778c7e5bf003945d84e4d3402d9ca5f642e8581",
+    "src/main.js": "d4758759ddb8fcf42c0308e826628840aec7f22f7f1b07fde559f837ef816ec7",
+    "src/tabletop.js": "401b9b7276622d3e24615024c235f6a1d23cb2049582af09451eee3a44e50bd8",
+    "test/conformance.test.js": "750fcbce01033a3047beddf1a517e3247de91a66f3bee5a244a756a9ea9aa656",
+    "test/goldens/lantern-walk.table-laptop.html": "0ca63c0c543be98f960b1ab3f396e360d655983a209af3fad11e0b5677231cbe",
+    "test/goldens/lantern-walk.table-phone.html": "e47edb8ba6b9bfcd49b698f1f0e4a5e534776b60b0efed7a2dd194748cca91d8",
+    "test/mock-api.js": "37f050aae660115032ef20a0a02f01a617dd2561a8b6ad4572d3c584e3e1a614",
+    "test/route.test.js": "f9e308efd838728c840c3728a9da7ea9560d19374ab13f334d5f1e354bdc9164",
+    "vite.config.js": "861533f25c79f18e643949731f7fdafaeeb3409f5be72aa44c05b702147afe12"
+  }
+}

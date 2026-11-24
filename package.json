@@ -1,0 +1,38 @@
+{
+  "name": "@pincast/cli",
+  "version": "0.1.0",
+  "description": "The pincast command: make a test app, send sets and collects, and test your webhook receiver.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "pincast": "bin/pincast.js"
+  },
+  "exports": {
+    ".": "./src/cli.js",
+    "./init": "./src/init/index.js",
+    "./webhooks": "./src/webhooks.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "template",
+    "template.json"
+  ],
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "@pincast/api": "0.1.0"
+  },
+  "scripts": {
+    "link-api": "node scripts/link-api.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "pincast",
+    "placecard",
+    "cli",
+    "webhooks"
+  ]
+}
