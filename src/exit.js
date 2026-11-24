@@ -21,7 +21,7 @@ const KEY_CODES = new Set(['key_missing', 'key_invalid', 'key_expired', 'key_con
 const BY_CODE = {
   usage: 'usage', folder_invalid: 'usage', api_invalid: 'usage', address_not_local: 'usage',
   folder_unreadable: 'local', folder_is_file: 'local', folder_not_empty: 'local', env_not_written: 'local',
-  id_not_written: 'local', file_unreadable: 'local', file_not_json: 'local', env_file_unreadable: 'local',
+  id_not_written: 'local', readme_not_written: 'local', file_unreadable: 'local', file_not_json: 'local', env_file_unreadable: 'local',
   set_not_registered: 'not_found', card_not_registered: 'not_found', no_test_app_service: 'not_found',
   rate_limited: 'wait', quota_exceeded: 'wait', test_apps_limit: 'wait',
   redirected: 'later', server_error: 'later', answer_lost: 'later', unreachable: 'later', signin_check_unavailable: 'later',

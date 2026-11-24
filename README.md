@@ -23,7 +23,9 @@ pincast init my-app
 cd my-app
 ```
 
-The folder has to be new or empty. The command copies a starter app into it, makes one test app, and saves the key in `.env`. Only your account can read that file, and git ignores it. It prints a claim link once. Open that link while signed in to Pincast to keep the app past its end date.
+The folder has to be new or empty. The command copies a starter app into it, makes one test app, and saves the key in `.env`. Only your account can read that file, and git ignores it. Then it sends the starter's set and one collect for the test person `test_demo`, so the app's first screen shows a real card. It prints a claim link once. Open that link while signed in to Pincast to keep the app past its end date.
+
+If the set or the collect doesn't go through, you still get your app. The command says which one is missing and prints the commands that send it.
 
 ## Commands
 
@@ -38,7 +40,7 @@ Run these in your app's folder, where `.env` holds the key.
 | `pincast collects <set>` | Reads the cards a person holds in a set |
 | `pincast webhooks sign --to <address>` | Signs a sample event and posts it to your receiver on this machine |
 
-For example, in the app `init` made:
+For example, in the app `init` made. `init` already sent this set once, and `sets put` sends it again after you change it:
 
 ```sh
 pincast sets put data/set.json --set old-town-lanterns
@@ -83,7 +85,7 @@ Add `--json` to any command. It then prints one JSON object on stdout and nothin
 
 A success reads `{ "ok": true, "command": ..., ... }`. A failure reads `{ "ok": false, "command": ..., "error": { "code", "kind", "exitCode", "message", ... } }`. When Pincast refused the call, `code` is the API's own error code, and `status`, `field`, `fix` and `retryAfter` come with it.
 
-`pincast init --json` names the file that holds the key, in `env` and `keyIn`. It never prints the key itself. Read `PINCAST_KEY` from that file.
+`pincast init --json` names the file that holds the key, in `env` and `keyIn`. It never prints the key itself. Read `PINCAST_KEY` from that file. `firstRun` says whether Pincast confirmed the starter's set and its one collect (`setConfirmed`, `collectConfirmed`, and `why` when it didn't), and `next` lists only the steps still left.
 
 The command never prompts and never reads standard input, so it runs the same in a script, in CI or for an agent.
 
@@ -103,7 +105,7 @@ The command never prompts and never reads standard input, so it runs the same in
 | 9 | `live` | A live key without `--live` |
 | 10 | `receiver` | Your webhook receiver answered with something other than a 2xx |
 | 11 | `waiting` | The person isn't linked yet. Send their sign-in token, then send it again |
-| 130 | `stopped` | Stopped with Ctrl-C |
+| 130 | `stopped` | Stopped with Ctrl-C. During `init`'s set and collect, the app is kept and the steps still print |
 
 ## For create-pincast
 

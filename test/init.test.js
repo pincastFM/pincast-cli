@@ -1,5 +1,8 @@
 // pincast init: create-pincast's flow (test/init-create-pincast.test.js runs that file's own tests on the
 // same code), plus what the pincast front adds: --json, --api, its exit codes and its own name.
+// Since the first run moved in (create-pincast f1dcb80), a good init makes three calls: POST /test-apps,
+// then the starter's set (PUT) and one collect (POST) with the new key. The stand-in below answers those
+// two the way the real routes do; every refusal of /test-apps still stops at one call.
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
@@ -7,7 +10,7 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { parseEnv } from 'node:util'
 import { EXIT } from '../src/exit.js'
-import { manifest, runCreate } from '../src/init/index.js'
+import { COLLECT_RETRY_KEY, FIRST_COLLECT, firstRunCommands, manifest, runCreate } from '../src/init/index.js'
 import { noFetch, pincast, printed, removeDir, tempDir } from './helpers.js'
 
 const ID = 'test-k3f7x2m4qa'
@@ -22,16 +25,27 @@ const GOOD = {
   api: 'https://api.pincast.fm/v1',
 }
 
+const SET_URL = '/v1/sets/old-town-lanterns'
+const COLLECT_URL = `${SET_URL}/collects`
+// The two first-run answers, in the shapes the real PUT and collect routes send (create-pincast's own).
+const PUT_ANSWER = { app: ID, set: 'old-town-lanterns', name: 'Old Town', setCreated: true, cards: { created: 8, updated: 0, unchanged: 0, parentsSet: 0 }, active: { lantern: 8 } }
+const COLLECT_ANSWER = { collected: true, first: true, count: 1, collectedAt: '2026-11-22T15:04:05.123Z', card: { key: 'lantern:ferry-steps', type: 'lantern' }, parent: null }
+
 let dir
 let server
 let calls
-const startApi = async (status, body, headers = {}) => {
+// status, body and headers answer POST /test-apps. firstRun answers the set and the collect: by default
+// as the real routes do, or { put, post } handlers to make either fail.
+const startApi = async (status, body, headers = {}, firstRun = {}) => {
   calls = []
   server = createServer((req, res) => {
     const chunks = []
     req.on('data', c => chunks.push(c))
     req.on('end', () => {
       calls.push({ method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks).toString() })
+      const answer = (s, b) => { res.writeHead(s, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(b)) }
+      if (req.method === 'PUT' && req.url === SET_URL) return firstRun.put ? firstRun.put(req, res) : answer(200, PUT_ANSWER)
+      if (req.method === 'POST' && req.url === COLLECT_URL) return firstRun.post ? firstRun.post(req, res) : answer(200, COLLECT_ANSWER)
       if (body === 'lost') return req.socket.destroy()
       res.writeHead(status, { 'Content-Type': 'application/json', ...headers })
       res.end(typeof body === 'string' ? body : JSON.stringify(body))
@@ -65,10 +79,9 @@ describe('pincast init --json', () => {
       actor: 'test_demo',
       claimUrl: CLAIM,
       api,
-      next: r.json.next,
+      firstRun: { setConfirmed: true, collectConfirmed: true, why: null },
+      next: ['cd my-app', 'npm ci', 'npm run dev'],
     })
-    assert.equal(r.json.next[0], 'cd my-app')
-    assert.equal(r.json.next.at(-1), 'npm run dev')
     const env = parseEnv(readFileSync(join(app, '.env'), 'utf8'))
     assert.equal(env.PINCAST_KEY, KEY)
     assert.equal(env.PINCAST_API, api)
@@ -78,15 +91,21 @@ describe('pincast init --json', () => {
     for (const file of Object.keys(manifest.files)) assert.ok(existsSync(join(app, file)), file)
   })
 
-  it('makes exactly one POST, with no body, no Origin and its own User-Agent', async () => {
+  it('makes exactly one POST to /test-apps, with no body, no Origin and its own User-Agent, then the first run', async () => {
     const api = await startApi(200, GOOD)
     await pincast(['init', '--json'], { env: { PINCAST_API: api }, cwd: dir })
-    assert.equal(calls.length, 1)
-    assert.equal(calls[0].method, 'POST')
-    assert.equal(calls[0].url, '/v1/test-apps')
+    assert.deepEqual(calls.map(c => `${c.method} ${c.url}`), ['POST /v1/test-apps', `PUT ${SET_URL}`, `POST ${COLLECT_URL}`])
     assert.equal(calls[0].body, '')
     assert.equal(calls[0].headers.origin, undefined)
     assert.match(calls[0].headers['user-agent'], /^pincast-cli\/\d+\.\d+\.\d+$/)
+    assert.equal(calls[0].headers['x-pincast-key'], undefined)
+    for (const c of calls.slice(1)) {
+      assert.equal(c.headers['x-pincast-key'], KEY)
+      assert.equal(c.headers['user-agent'], calls[0].headers['user-agent'])
+      assert.equal(c.headers.origin, undefined)
+    }
+    assert.equal(calls[2].headers['idempotency-key'], COLLECT_RETRY_KEY)
+    assert.deepEqual(JSON.parse(calls[2].body), FIRST_COLLECT)
     assert.ok(existsSync(join(dir, 'pincast-app', '.env')))
   })
 
@@ -96,7 +115,62 @@ describe('pincast init --json', () => {
     assert.equal(r.code, 0)
     const r2 = await pincast(['init', 'b', '--json'], { env: { PINCAST_CREATE_API: api }, cwd: dir })
     assert.equal(r2.code, 0)
-    assert.equal(calls.length, 2)
+    assert.equal(calls.filter(c => c.url === '/v1/test-apps').length, 2)
+    assert.equal(calls.length, 6)
+  })
+})
+
+describe('pincast init, the first run', () => {
+  it('a set that fails keeps the app, exits 0 and lists both commands, in one JSON object', async () => {
+    const api = await startApi(200, GOOD, {}, { put: (req, res) => { res.writeHead(500); res.end(`{"key":"${KEY}"}`) } })
+    const r = await pincast(['init', 'my-app', '--json'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.equal(r.code, 0)
+    assert.equal(r.stderr, '')
+    assert.deepEqual(r.json.firstRun, { setConfirmed: false, collectConfirmed: false, why: 'it answered 500' })
+    assert.deepEqual(r.json.next, ['cd my-app', 'npm ci', ...firstRunCommands(api, 'both'), 'npm run dev'])
+    assert.equal(calls.filter(c => c.url === COLLECT_URL).length, 0)
+    assert.equal(parseEnv(readFileSync(join(dir, 'my-app', '.env'), 'utf8')).PINCAST_KEY, KEY)
+    assert.ok(!r.stdout.includes(SECRET))
+  })
+
+  it('a collect that fails lists only the collect, with its retry key', async () => {
+    const api = await startApi(200, GOOD, {}, { post: (req) => { req.socket.destroy() } })
+    const r = await pincast(['init', 'my-app', '--json'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.equal(r.code, 0)
+    assert.deepEqual(r.json.firstRun, { setConfirmed: true, collectConfirmed: false, why: 'the connection failed' })
+    assert.ok(r.json.next.some(l => l.includes(`Idempotency-Key: ${COLLECT_RETRY_KEY}`)))
+    assert.ok(!r.json.next.some(l => l.includes('curl -X PUT')))
+  })
+
+  it('says it is sending in text, and never under --json', async () => {
+    const api = await startApi(200, GOOD)
+    const text = await pincast(['init', 'a'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.ok(text.stdout.startsWith('Sending the starter\'s set and one test collect to Pincast.\n\n'))
+    const json = await pincast(['init', 'b', '--json'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.ok(json.stdout.startsWith('{'))
+  })
+
+  it('Ctrl-C during the first run keeps the app and exits 130, as JSON with the app in result', async () => {
+    const api = await startApi(200, GOOD, {}, { put: () => { setImmediate(() => process.emit('SIGINT')) } })
+    const r = await pincast(['init', 'my-app', '--json'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.equal(r.code, EXIT.stopped)
+    assert.equal(r.stderr, '')
+    assert.equal(r.json.ok, false)
+    assert.equal(r.json.error.code, 'stopped')
+    assert.equal(r.json.result.app.id, ID)
+    assert.deepEqual(r.json.result.firstRun, { setConfirmed: false, collectConfirmed: false, why: 'stopped' })
+    assert.equal(process.listenerCount('SIGINT'), 0)
+    assert.equal(parseEnv(readFileSync(join(dir, 'my-app', '.env'), 'utf8')).PINCAST_KEY, KEY)
+    assert.ok(!r.stdout.includes(SECRET))
+  })
+
+  it('Ctrl-C during the first run, in text: the steps and the link on stdout, exit 130', async () => {
+    const api = await startApi(200, GOOD, {}, { put: () => { setImmediate(() => process.emit('SIGINT')) } })
+    const r = await pincast(['init', 'my-app'], { env: { PINCAST_API: api }, cwd: dir })
+    assert.equal(r.code, EXIT.stopped)
+    assert.equal(r.stderr, '')
+    assert.ok(r.stdout.includes(CLAIM))
+    for (const line of firstRunCommands(api, 'both')) assert.ok(r.stdout.includes(`  ${line}\n`), line)
   })
 })
 
@@ -169,7 +243,9 @@ describe('one code path', () => {
     assert.equal(mine.stdout.replaceAll('appmine', 'apptheirs'), theirs)
     const readme = name => readFileSync(join(dir, name, 'README.md'), 'utf8')
     assert.equal(readme('appmine').replace('`pincast init`', '`npm create pincast`'), readme('apptheirs'))
-    assert.equal(calls[1].headers['user-agent'], 'create-pincast')
+    const theirCalls = calls.slice(3)
+    assert.deepEqual(theirCalls.map(c => `${c.method} ${c.url}`), ['POST /v1/test-apps', `PUT ${SET_URL}`, `POST ${COLLECT_URL}`])
+    for (const c of theirCalls) assert.equal(c.headers['user-agent'], 'create-pincast')
   })
 
   it('never printed the key in any of these runs', () => {

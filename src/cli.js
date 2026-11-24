@@ -7,7 +7,7 @@ import { resolve } from 'node:path'
 import { parseArgs, parseEnv } from 'node:util'
 import { Pincast, PincastError, isTestPerson, keyInfo } from '@pincast/api'
 import { EXIT, exitCodeOf, kindOf } from './exit.js'
-import { apiBase, createApp, DEFAULT_FOLDER, hideKeys, nextSteps, Stop, successText, TEST_PERSON } from './init/index.js'
+import { apiBase, createApp, DEFAULT_FOLDER, firstRunResult, hideKeys, nextSteps, SENDING, Stop, successText, TEST_PERSON } from './init/index.js'
 import { EVENT_TYPES, ID_RE, USER_AGENT as WEBHOOK_AGENT, isLocalAddress, newEventId, sampleEvent, secretBytes, signedHeaders } from './webhooks.js'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -128,7 +128,10 @@ const COMMANDS = {
       { '--api': ctx.opts.api, PINCAST_API: ctx.conf.PINCAST_API, PINCAST_CREATE_API: ctx.conf.PINCAST_CREATE_API },
       ['--api', 'PINCAST_API', 'PINCAST_CREATE_API'],
     )
-    const made = await createApp({ folder, command: 'pincast init', base, custom, cwd: ctx.cwd, fetchImpl: ctx.fetchImpl, beforeCopy: ctx.beforeCopy, userAgent: USER_AGENT })
+    const made = await createApp({
+      folder, command: 'pincast init', base, custom, cwd: ctx.cwd, fetchImpl: ctx.fetchImpl, beforeCopy: ctx.beforeCopy,
+      userAgent: USER_AGENT, firstRunTimeoutMs: ctx.firstRunTimeoutMs, onFirstRun: () => ctx.progress(SENDING),
+    })
     return {
       text: successText(made),
       json: {
@@ -139,8 +142,11 @@ const COMMANDS = {
         actor: TEST_PERSON,
         claimUrl: made.claimUrl,
         api: made.base,
+        firstRun: firstRunResult(made.first),
         next: nextSteps(made),
       },
+      // Ctrl-C during the first run keeps the app: the steps still print, and the exit code is 130.
+      ...(made.stopped ? { stopped: new Stop('Stopped during the first run. The app is made and its key is in .env, and the steps below send what is left.', EXIT.stopped, 'stopped') } : {}),
     }
   },
 
@@ -314,6 +320,7 @@ export async function main(argv, {
   err = text => process.stderr.write(text),
   fetchImpl = globalThis.fetch,
   beforeCopy = () => {},
+  firstRunTimeoutMs,
 } = {}) {
   const wantsJson = argv.includes('--json')
   const say = text => out(hide(text))
@@ -344,7 +351,15 @@ export async function main(argv, {
     const extra = Object.keys(opts).filter(o => !COMMON.includes(o) && !ALLOWED[name].includes(o))
     if (extra.length) throw usage(`pincast ${name} doesn't take --${extra[0]}.\n\n${USAGE}`)
     const conf = settings(env, cwd, opts['env-file'])
-    const done = await COMMANDS[name]({ args: found.args, opts, conf, cwd, fetchImpl, beforeCopy })
+    // Only a text run hears about progress: under --json, stdout holds one JSON object and nothing else.
+    const progress = opts.json ? () => {} : say
+    const done = await COMMANDS[name]({ args: found.args, opts, conf, cwd, fetchImpl, beforeCopy, firstRunTimeoutMs, progress })
+    if (done.stopped) {
+      const error = describeError(done.stopped)
+      if (opts.json) sayJson({ ok: false, command: name, error, result: done.json })
+      else say(done.text)
+      return error.exitCode
+    }
     if (opts.json) sayJson({ ok: true, command: name, ...done.json })
     else say(done.text)
     return EXIT.ok

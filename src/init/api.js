@@ -1,5 +1,5 @@
-// The one call `init` makes: POST /test-apps. Moved here from create-pincast 0.1.0 (6fb6be7), which
-// becomes a shim over this file. Each Stop now names a code, so `pincast init --json` can report it and
+// The call that makes the app: POST /test-apps. Moved here from create-pincast 0.1.0 (6fb6be7, then
+// 2b75d2f's firewall wait), which becomes a shim over this file. Each Stop now names a code, so `pincast init --json` can report it and
 // pick an exit code, while the shim keeps the exit codes create-pincast always had.
 export const DEFAULT_API = 'https://api.pincast.fm/v1'
 export const API_ENV = 'PINCAST_CREATE_API'
@@ -89,7 +89,8 @@ function refusal(status, text, retryAfter, base) {
     const wait = waitText(retryAfter)
     return code === 'test_apps_limit'
       ? new Stop(`Pincast has made all the test apps it makes in a day. Try again ${wait}.`, 1, 'test_apps_limit', said)
-      : new Stop(`Too many test apps have come from this network. Try again ${wait}.`, 1, code || 'rate_limited', said)
+      // The firewall's 429 carries no Retry-After, and its window is 10 minutes.
+      : new Stop(`Too many test apps have come from this network. Try again ${wait === 'later' ? 'in 10 minutes' : wait}.`, 1, code || 'rate_limited', said)
   }
   if (status === 403 && code === 'browser_not_allowed') {
     return new Stop('Pincast refused this call as one from a web page. This command sends no Origin header, so a proxy or network tool probably added it. Try again from a plain terminal.', 1, 'browser_not_allowed', said)

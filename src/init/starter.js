@@ -1,16 +1,21 @@
 import { constants, chmodSync, copyFileSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-// Moved here from create-pincast 0.1.0 (6fb6be7). The command's name is now an argument, so the text
-// reads `pincast init` here and `npm create pincast` from the create-pincast shim.
+// Moved here from create-pincast 0.1.0 (6fb6be7, then f1dcb80's first run). The command's name is now
+// an argument, so the text reads `pincast init` here and `npm create pincast` from the create-pincast shim.
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 // The starter's files and the commit they came from.
 export const manifest = JSON.parse(readFileSync(join(root, 'template.json'), 'utf8'))
 
 const STARTER_ID = 'lantern-walk'
-const SET_ID = 'old-town-lanterns'
+export const SET_ID = 'old-town-lanterns'
 export const TEST_PERSON = 'test_demo'
+
+// The one collect the command sends. The printed command repeats the same body and the same retry key,
+// so Pincast treats the two as one call for 24 hours, and a lost answer can't count a second collect.
+export const FIRST_COLLECT = { card: 'lantern:ferry-steps', actor: { id: TEST_PERSON, source: 'anonymous' } }
+export const COLLECT_RETRY_KEY = 'create-pincast-first-collect'
 
 // The example app's README predates test keys. template/ is rebuilt byte for byte from that repo, so a
 // fix made there would be lost at the next sync. Each new app's copy is corrected here instead. Once the
@@ -89,26 +94,41 @@ export function setAppId(target, id) {
   }
 }
 
-/** The commands that put a live card on the table, as printed and as written in the README. */
-export function firstRunCommands(base) {
-  return [
-    'set -a; . ./.env; set +a',
+/**
+ * The commands that send what the first run still needs, as printed and as written in the README.
+ * left is 'both', 'collect' or 'none'. After a collect that may have landed ('collect'), the command
+ * carries the retry key, so running it can't count a second collect.
+ */
+export function firstRunCommands(base, left = 'both') {
+  if (left === 'none') return []
+  const put = [
     `curl -X PUT ${base}/sets/${SET_ID} \\`,
     '  -H "X-Pincast-Key: $PINCAST_KEY" \\',
     '  -H "Content-Type: application/json" \\',
     '  -d @data/set.json',
+  ]
+  const collect = [
     `curl -X POST ${base}/sets/${SET_ID}/collects \\`,
     '  -H "X-Pincast-Key: $PINCAST_KEY" \\',
     '  -H "Content-Type: application/json" \\',
-    `  -d '{ "card": "lantern:ferry-steps", "actor": { "id": "${TEST_PERSON}", "source": "anonymous" } }'`,
+    ...(left === 'collect' ? [`  -H "Idempotency-Key: ${COLLECT_RETRY_KEY}" \\`] : []),
+    `  -d '{ "card": "${FIRST_COLLECT.card}", "actor": { "id": "${TEST_PERSON}", "source": "anonymous" } }'`,
   ]
+  return ['set -a; . ./.env; set +a', ...(left === 'collect' ? [] : put), ...collect]
+}
+
+const README_LEAD = {
+  none: `This app's set and one collect for \`${TEST_PERSON}\` are already on Pincast. To see them, install the app and start it:`,
+  collect: "This app's set is on Pincast. To see live cards, install the app, send its one collect, then start it:",
+  both: 'To see live cards, install the app, send its set and one collect, then start it:',
 }
 
 /**
- * Adds this copy's own section to its README. The starter's Go live steps open by replacing .env, which
- * here would erase the key. The claim link stays out, because a README gets committed.
+ * Adds this copy's own section to its README, saying what the first run left to do. The starter's Go
+ * live steps open by replacing .env, which here would erase the key. The claim link stays out, because
+ * a README gets committed.
  */
-export function addReadmeSection(target, { id, base, endsOn, command }) {
+export function addReadmeSection(target, { id, base, endsOn, command, left = 'both' }) {
   const path = join(target, 'README.md')
   const readme = readFileSync(path, 'utf8').replace(OLD_KEY_LINE, () => LIVE_KEY_LINE)
   const anchor = '## Run it\n'
@@ -118,11 +138,11 @@ export function addReadmeSection(target, { id, base, endsOn, command }) {
     '',
     `\`${command}\` made this copy and the test app \`${id}\` for it. The key and the claim link are in \`.env\`, which git ignores. A test key writes only to this app, and only for test people, whose ids start with \`test_\`.`,
     '',
-    'To see live cards, install the app, send its set and one collect, then start it:',
+    README_LEAD[left],
     '',
     '```sh',
     'npm ci',
-    ...firstRunCommands(base),
+    ...firstRunCommands(base, left),
     'npm run dev',
     '```',
     '',
