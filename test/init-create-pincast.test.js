@@ -107,7 +107,7 @@ describe('a good answer', () => {
   })
 
   it('leaves out the starter README line that says every key is live', async () => {
-    assert.ok(readFileSync(storedPath('README.md'), 'utf8').includes('Every Pincast key is live'))
+    assert.ok(readFileSync(storedPath('README.md'), 'utf8').includes(LIVE_KEY_LINE)) // the example's own line since 7072ad2
     const base = await startApi(goodApi())
     await create(base)
     const readme = readFileSync(join(dir, 'app', 'README.md'), 'utf8')
@@ -519,7 +519,7 @@ describe('the package', () => {
   it('depends on @pincast/api alone, at an exact version', () => assert.deepEqual(Object.keys(pkg.dependencies), ['@pincast/api']))
 
   it('records the commit, and its files match their hashes', () => {
-    assert.match(manifest.commit, /^192ebea[0-9a-f]{33}$/)
+    assert.match(manifest.commit, /^c6393d4[0-9a-f]{33}$/)
     for (const [file, sha] of Object.entries(manifest.files)) {
       assert.equal(createHash('sha256').update(readFileSync(storedPath(file))).digest('hex'), sha, file)
     }
